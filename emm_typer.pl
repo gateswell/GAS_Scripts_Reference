@@ -12,7 +12,7 @@ use Cwd qw(abs_path);
 #module load ncbi-blast+/2.2.29
 #module load BEDTools/2.17.0
 #module load Python/2.7
-
+#modified by caoshuhuan at 2019-03-22 for support SE fastq
 sub checkOptions {
     my %opts;
     getopts('h:1:2:r:o:n:', \%opts);
