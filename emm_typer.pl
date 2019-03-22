@@ -5,6 +5,7 @@ use warnings;
 use Data::Dumper;
 #use Getopt::Long;
 use Getopt::Std;
+use Cwd qw(abs_path);
 
 ###MODULE LOAD###
 #module load perl/5.12.3
@@ -14,7 +15,7 @@ use Getopt::Std;
 
 sub checkOptions {
     my %opts;
-    getopts('h1:2:r:o:n:', \%opts);
+    getopts('h:1:2:r:o:n:', \%opts);
     my ($help, $fastq1, $fastq2, $emm_DB, $outDir, $outName);
 
     if($opts{h}) {
@@ -25,14 +26,14 @@ sub checkOptions {
     if($opts{1}) {
         $fastq1 = $opts{1};
         if( -e $fastq1) {
-            print "Paired-end Read 1 is: $fastq1\n";
+            print "Paired-end Read 1 or Single-end Read is: $fastq1\n";
         } else {
-            print "The forward paired-end file name is not in the correct format or doesn't exist.\n";
+            print "The forward paired-end or Single-end file name is not in the correct format or doesn't exist.\n";
             print "Make sure you provide the full path (/root/path/fastq_file).\n";
             help();
         }
     } else {
-        print "No paired end 1 fastq file path argument given.\n";
+        print "No paired end 1 or single end file path argument given.\n";
         help();
     }
 
@@ -64,7 +65,8 @@ sub checkOptions {
 	help();
     }
 
-    $outDir = "./";
+    $outDir ||= `pwd`;
+	$outDir = abs_path($outDir);
     if($opts{o}) {
         if (-d $opts{o}) {
             $outDir = $opts{o};
@@ -95,10 +97,10 @@ sub help
 die <<EOF
 
 USAGE
-emm_typer.pl -1 <forward fastq file: fastq> -2 <reverse fastq file: fastq> -r <reference databases directory: file path> -o <output directory name: string> -n <output name prefix: string>  [OPTIONS]
+$0 -1 <forward fastq file: fastq> -2 <reverse fastq file: fastq> -r <reference databases directory: file path> -o <output directory name: string> -n <output name prefix: string>  [OPTIONS]
 
     -h   print usage
-    -1   forward fastq sequence filename (including full path)
+    -1   forward fastq sequence filename or single end fastq sequence filename (including full path)
     -2   reverse fastq sequence filename (including full path)
     -r   emm reference sequence directory (including full path)
     -o   output directory
@@ -118,29 +120,38 @@ print $fh "Sample_Name\temm_Type\temm_Seq\tPercent_Identity\tMatch_Length\n";
 
 ###Preprocess with Cutadapt###
 my $fastq1_trimd = "cutadapt_".$outName."_S1_L001_R1_001.fastq";
-my $fastq2_trimd = "cutadapt_".$outName."_S1_L001_R2_001.fastq";
+my $fastq2_trimd = "cutadapt_".$outName."_S1_L001_R2_001.fastq" if $fastq2;
 if( -e $fastq1_trimd) {
     print "Fastq files have already been preprocessed\n";
 } else {
     print "Beginning cutadapt\n";
-    system("cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2");
-    system("cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 --paired-output $fastq1_trimd -o $fastq2_trimd temp2.fastq temp1.fastq");
-    #`cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2`;
-    #`cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 --paired-output $fastq1_trimd -o $fastq2_trimd temp2.fastq temp1.fastq`;
-    #system("cutadapt --version > cut_temp.txt")
-    #system("cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 -o $fastq1_trimd -p $fastq2_trimd $fastq1 $fastq2");
-    my $tempDel_1 = "temp1.fastq";
-    my $tempDel_2 = "temp2.fastq";
-    unlink $tempDel_1;
-    unlink $tempDel_2;
+	if($fastq2,){	#pair-end
+		system("cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2");
+		system("cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 --paired-output $fastq1_trimd -o $fastq2_trimd temp2.fastq temp1.fastq");
+		#`cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2`;
+		#`cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 --paired-output $fastq1_trimd -o $fastq2_trimd temp2.fastq temp1.fastq`;
+		#system("cutadapt --version > cut_temp.txt")
+		#system("cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 -o $fastq1_trimd -p $fastq2_trimd $fastq1 $fastq2");
+		my $tempDel_1 = "temp1.fastq";
+		my $tempDel_2 = "temp2.fastq";
+		unlink $tempDel_1;
+		unlink $tempDel_2;
+	}
+	else{			#single-end
+		system("cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 -o temp1.fastq $fastq1");
+		system("cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 -o $fastq1_trimd temp1.fastq");
+		my $tempDel_1 = "temp1.fastq";
+		unlink $tempDel_1;
+	}
 }
 
 if( -d "./velvet_output") {
     print "Velvet assembly has already been completed\n";
 } else {
     print "Beginning Velvet\n";
-    my $velvetK_val = `velvetk.pl --best --size 1.8M "$fastq1_trimd" "$fastq2_trimd"`;
-    `VelvetOptimiser.pl -s "$velvetK_val" -e "$velvetK_val" -o "-scaffolding no" -f "-shortPaired -separate -fastq $fastq1_trimd $fastq2_trimd" -d velvet_output`;
+    my $velvetK_val = (opts{2})? `velvetk.pl --best --size 1.8M "$fastq1_trimd" "$fastq2_trimd"`:`velvetk.pl --best --size 1.8M "$fastq1_trimd"`;
+    `VelvetOptimiser.pl -s "$velvetK_val" -e "$velvetK_val" -o "-scaffolding no" -f "-shortPaired -separate -fastq $fastq1_trimd $fastq2_trimd" -d velvet_output` if $fastq2;
+	`VelvetOptimiser.pl -s "$velvetK_val" -e "$velvetK_val" -o "-scaffolding no" -f "-short -separate -fastq $fastq1_trimd " -d velvet_output`;
 }
 
 print "Blast assembled contigs against the forward primer reference sequence\n";
