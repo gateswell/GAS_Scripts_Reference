@@ -6,6 +6,7 @@ use Data::Dumper;
 #use Getopt::Long;
 use Getopt::Std;
 use Cwd qw(abs_path);
+use File::Basename;
 
 ###MODULE LOAD###
 #module load perl/5.12.3
@@ -47,8 +48,9 @@ sub checkOptions {
             help();
         }
     } else {
-        print "No paired end 2 fastq file path argument given.\n";
-        help();
+		$fastq2 = '';
+    #    print "No paired end 2 fastq file path argument given.\n";
+    #    help();
     }
 
     if($opts{r}) {
@@ -84,7 +86,8 @@ sub checkOptions {
         $outName = $opts{n};
         print "The output file name prefix: $outName\n";
     } else {
-        $outName = `echo "$fastq1" | awk -F"/" '{print \$(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+        #$outName = `echo "$fastq1" | awk -F"/" '{print \$(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+		$outName = basename($fastq1);$outName=~s/\.fq(.gz)?//g;
         print "The default output file name prefix is: $outName";
     }
 
@@ -97,13 +100,15 @@ sub help
 die <<EOF
 
 USAGE
-$0 -1 <forward fastq file: fastq> -2 <reverse fastq file: fastq> -r <reference databases directory: file path> -o <output directory name: string> -n <output name prefix: string>  [OPTIONS]
+$0 -1 <forward fastq file: fastq> -2 [reverse fastq file: fastq] -r <reference databases directory: file path> -o <output directory name: string> -n <output name prefix: string>  [OPTIONS]
 
     -h   print usage
-    -1   forward fastq sequence filename or single end fastq sequence filename (including full path)
+   *-1   forward fastq sequence filename or single end fastq sequence filename (including full path)
     -2   reverse fastq sequence filename (including full path)
-    -r   emm reference sequence directory (including full path)
-    -o   output directory
+   *-r   emm reference sequence directory (including full path)
+	-F   forward adapter sequence	[default: AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC]
+	-R   reverse adapter sequence	[default: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT]
+   *-o   output directory
     -n   output name prefix
 
 EOF
@@ -111,7 +116,7 @@ EOF
 
 my ($help, $fastq1, $fastq2, $emm_DB, $outDir, $outName) = checkOptions( @ARGV );
 
-
+my $fwd ||='AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'; my $rwd ||= 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT';
 ##Start Doing Stuff##
 chdir "$outDir";
 my $emmType_output = "emm-Type_Results.txt";
@@ -125,7 +130,7 @@ if( -e $fastq1_trimd) {
     print "Fastq files have already been preprocessed\n";
 } else {
     print "Beginning cutadapt\n";
-	if($fastq2,){	#pair-end
+	if($fastq2){	#pair-end
 		system("cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2");
 		system("cutadapt -b AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -q 20 --minimum-length 50 --paired-output $fastq1_trimd -o $fastq2_trimd temp2.fastq temp1.fastq");
 		#`cutadapt -b AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -q 20 --minimum-length 50 --paired-output temp2.fastq -o temp1.fastq $fastq1 $fastq2`;
