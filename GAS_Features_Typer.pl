@@ -5,7 +5,7 @@ use warnings;
 use Data::Dumper;
 #use Getopt::Long;
 use Getopt::Std;
-
+use File::Basename;
 ###MODULE LOAD###
 #module load samtools/0.1.18
 #module load bowtie2/2.1.0
@@ -14,7 +14,7 @@ use Getopt::Std;
 
 sub checkOptions {
     my %opts;
-    getopts('h1:2:d:f:o:n:', \%opts);
+    getopts('h:1:2:d:f:o:n:', \%opts);
     my ($help, $fastq1, $fastq2, $ref_dir, $feat_DB, $outDir, $outName);
 
     if($opts{h}) {
@@ -25,9 +25,11 @@ sub checkOptions {
     if($opts{1}) {
         $fastq1 = $opts{1};
         if( -e $fastq1) {
-            print "Paired-end Read 1 is: $fastq1\n";
+            #print "Paired-end Read 1 is: $fastq1\n";
+			print "Read 1 is: $fastq1\n";
         } else {
-            print "The forward paired-end file name is not in the correct format or doesn't exist.\n";
+            #print "The forward paired-end file name is not in the correct format or doesn't exist.\n";
+			print "The fastq file name is not in the correct format or doesn't exist.\n";
             print "Make sure you provide the full path (/root/path/fastq_file).\n";
             help();
         }
@@ -46,8 +48,9 @@ sub checkOptions {
             help();
         }
     } else {
-        print "No paired end 2 fastq file path argument given.\n";
-        help();
+		$fastq2 ='';
+        #print "No paired end 2 fastq file path argument given.\n";
+        #help();
     }
 
     if($opts{d}) {
@@ -97,10 +100,10 @@ sub checkOptions {
         $outName = $opts{n};
         print "The output file name prefix: $outName\n";
     } else {
-        $outName = `echo "$fastq1" | awk -F"/" '{print $(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+        #$outName = `echo "$fastq1" | awk -F"/" '{print $(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+		$outName = basename($outName);$outName=~s/\.fq(.gz)?//g;
         print "The default output file name prefix is: $outName";
     }
-
     return ($help, $fastq1, $fastq2, $ref_dir, $feat_DB, $outDir, $outName);
 }
 
@@ -113,11 +116,11 @@ USAGE
 GAS_Features_Typer.pl -1 <forward fastq file: fastq> -2 <reverse fastq file: fastq> -r <ref directory: dir> -p <feature seq: file> -o <output directory name: string> -n <output name prefix: string> [OPTIONS]
 
     -h   print usage
-    -1   forward fastq sequence filename (including full path)
+   *-1   forward fastq sequence filename (including full path)
     -2   reverse fastq sequence filename (including full path)
-    -d   reference sequence directory (including full path)
-    -f   features sequence reference file
-    -o   output directory
+   *-d   reference sequence directory (including full path)
+   *-f   features sequence reference file
+   *-o   output directory
     -n   output name prefix
 
 EOF
@@ -165,7 +168,11 @@ open(my $bh,'>',$BIN_feat_out) or die "Could not open file '$BIN_feat_out' $!";
 my @Bin_Feat_arr = (0) x 26;
 #print $fh "Feature_Group\tTarget\n";
 my $outNameFEAT = "FEAT_".$outName;
-system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $outNameFEAT --log --save_scores --min_coverage 99.9 --max_divergence 8 --gene_db $feat_DB");
+if ($fastq2){
+	system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $outNameFEAT --log --save_scores --min_coverage 99.9 --max_divergence 8 --gene_db $feat_DB");
+}else{
+	system("srst2 --samtools_args '\\-A' --input_se $fastq1 --output $outNameFEAT --log --save_scores --min_coverage 99.9 --max_divergence 8 --gene_db $feat_DB");
+}
 my @TEMP_FEAT_fullgene = glob("FEAT_*__fullgenes__*__results\.txt");
 my $FEAT_full_name = $TEMP_FEAT_fullgene[0];
 
