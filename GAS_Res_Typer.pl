@@ -9,7 +9,7 @@ use File::Copy qw(copy);
 use Env;
 use lib $ENV{MODULESHOME}."/init";
 use perl;
-
+use File::Basename;
 ###MODULE LOAD###
 #module load samtools/0.1.18
 #module load bowtie2/2.1.0
@@ -50,8 +50,9 @@ sub checkOptions {
             help();
         }
     } else {
-        print "No paired end 2 fastq file path argument given.\n";
-        help();
+		$fastq2='';
+        #print "No paired end 2 fastq file path argument given.\n";
+        #help();
     }
 
     if($opts{d}) {
@@ -101,10 +102,10 @@ sub checkOptions {
         $outName = $opts{n};
         print "The output file name prefix: $outName\n";
     } else {
-        $outName = `echo "$fastq1" | awk -F"/" '{print \$(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+        #$outName = `echo "$fastq1" | awk -F"/" '{print \$(NF)}' | sed 's/_S[0-9]\\+_L[0-9]\\+_R[0-9]\\+.*//g'`;
+		$outName=basename($outName);$outName=~s/\.fq(.gz)?//g;
         print "The default output file name prefix is: $outName";
     }
-
     return ($help, $fastq1, $fastq2, $ref_dir, $res_DB, $outDir, $outName);
 }
 
@@ -117,11 +118,11 @@ USAGE
 GAS_Res_Typer.pl -1 <forward fastq file: fastq> -2 <reverse fastq file: fastq> -d <ref directory: dir> -r <resistance seq: file> -o <output directory name: string> -n <output name prefix: string> [OPTIONS]
 
     -h   print usage
-    -1   forward fastq sequence filename (including full path)
+   *-1   forward fastq sequence filename (including full path)
     -2   reverse fastq sequence filename (including full path)
-    -d   reference sequence directory (including full path)
-    -r   resistance reference sequence file
-    -o   output directory
+   *-d   reference sequence directory (including full path)
+   *-r   resistance reference sequence file
+   *-o   output directory
     -n   output name prefix
 
 EOF
@@ -310,11 +311,11 @@ my @Bin_Res_arr = (0) x 20;
 my $outNameRES = "RES_".$outName;
 my $out_nameARG = "ARG_".$outName;
 my $out_nameRESFI = "RESFI_".$outName;
-system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $outNameRES --log --save_scores --min_coverage 99.9 --max_divergence 5 --gene_db $res_DB");
+if($fastq2){system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $outNameRES --log --save_scores --min_coverage 99.9 --max_divergence 5 --gene_db $res_DB");}else{system("srst2 --samtools_args '\\-A' --input_se $fastq1 --output $outNameRES --log --save_scores --min_coverage 99.9 --max_divergence 5 --gene_db $res_DB");}
 ###Type ARG-ANNOT Resistance Genes###
-system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $out_nameARG --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ARGannot_r1.fasta");
+if($fastq2){system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $out_nameARG --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ARGannot_r1.fasta");}else{system("srst2 --samtools_args '\\-A' --input_se $fastq1 --output $out_nameARG --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ARGannot_r1.fasta");}
 ###Type ResFinder Resistance Gene###
-system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $out_nameRESFI --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ResFinder.fasta");
+if($fastq2){system("srst2 --samtools_args '\\-A' --input_pe $fastq1 $fastq2 --output $out_nameRESFI --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ResFinder.fasta");}else{system("srst2 --samtools_args '\\-A' --input_se $fastq1 --output $out_nameRESFI --log --save_scores --min_coverage 70 --max_divergence 30 --gene_db $ref_dir/ResFinder.fasta");}
 #=cut
 
 my @TEMP_RES_bam = glob("RES_*\.sorted\.bam");
